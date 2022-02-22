@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <title>Glide Range Map version 1.1</title>
+    <!-- 
+        Change History
+        Version 1.1.1
+        * Removed "Load file" and "Update" buttons; map now automatically updates when inputs change
+        
+        Version 1.1
+        * Fixed problem with negative radius
+        * Now reads CUP files with field elevation in feet or meters
+
+        * Now discards tasks before parsing the CUP file by discarding 
+          everything that follows the "-----Related Tasks-----" line
+     -->
+
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
+
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css"
+        integrity="sha512-xodZBNTC5n17Xt2atTPuE1HxjVMSvLVW9ocqUKLsCC5CXdbqCmblAshOMAS6/keqq/sMZMZ19scR4PsZChSR7A=="
+        crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"
+        integrity="sha512-XQoYMqMTK8LvdxXYG3nZ448hOEQiglfqkJs1NOQV44cWnUrBc8PkAOcXy20w0vlaXaVUearIOBhiXZ5V3ynxwA=="
+        crossorigin=""></script>
+
+    <!-- CSS and JS files for Search Box -->
+    <script src="https://cdn-geoweb.s3.amazonaws.com/esri-leaflet/0.0.1-beta.5/esri-leaflet.js"></script>
+
+    <script
+        src="https://cdn-geoweb.s3.amazonaws.com/esri-leaflet-geocoder/0.0.1-beta.5/esri-leaflet-geocoder.js"></script>
+
+    <link rel="stylesheet" type="text/css"
+        href="https://cdn-geoweb.s3.amazonaws.com/esri-leaflet-geocoder/0.0.1-beta.5/esri-leaflet-geocoder.css">
+
+    <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        .leaflet-container {
+            height: 600px;
+            width: 1000px;
+            max-width: 100%;
+            max-height: 100%;
+        }
+    </style>
+
+    <style>
+        g {
+            opacity: 0.25;
+        }
+    </style>
+
+
+</head>
+
+<body>
+    <form id="myForm">
+        <input type="file" id="csvFile" accept=".cup" />
+    </form>
+
+    <br>
+    <form id="glideParameters">
+        <div id="map" style="width: 1000px; height: 600px;"></div>
+
+        <!-- <form id="options"> -->
+        <label for="glideRatioInput">Glide Ratio</label> <input type="number" value="20" min="0" id="glideRatioInput"
+            name="glideRatioInput" autofocus />
+        <br>
+        <label for="altitudeInput">Altitude AGL (ft)</label> <input type="number" value="3500" min="0"
+            id="altitudeInput" name="altitudeInput" autofocus />
+        <br>
+        <label for="arrivalHeightInput">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
+            id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
+        <br>
+
+        <div>
+            <input class="messageCheckbox" type="checkbox" id="airports" name="fieldType" checked>
+            <label for="airports">Airports</label>
+        </div>
+
+        <div>
+            <input class="messageCheckbox" type="checkbox" id="grassStrips" name="fieldType">
+            <label for="grassStrips">Grass Strips</label>
+        </div>
+
+        <div>
+            <input class="messageCheckbox" type="checkbox" id="landableFields" name="fieldType">
+            <label for="landableFields">Landable Fields</label>
+        </div>
+
+        <button onclick="buttonUpdateClick()">Update</button>
+    </form>
+
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
+    <script src="http://code.jquery.com/jquery-3.3.1.slim.js"
+        integrity="sha256-fNXJFIlca05BIO2Y5zh1xrShK3ME+/lYZ0j+ChxX2DA=" crossorigin="anonymous"></script>
+    <script src="jquery.csv.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
+
+    <script src="glideRange.js"></script>
+
+</body>
+</html>
