@@ -38,10 +38,6 @@
         // 		.openOn(map);
         // }
 
-        function buttonUpdateClick(e) {
-            drawLandingSpots();
-        }
-
         // Updates the radius of the circle for every landing spot using the parameters read from the form
         function drawLandingSpots(e) {
             let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
