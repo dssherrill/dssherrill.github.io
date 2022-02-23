@@ -147,6 +147,14 @@ function loadCupFile(e) {
     reader.readAsText(input);
 }
 
+// These address the unpredictable column labels in the CUP file, as described
+// in the large comment below.
+const INDEX_NAME = 0;
+const INDEX_LAT = 3;
+const INDEX_LON = 4;
+const INDEX_ELEV = 5;
+const INDEX_STYLE = 6;
+
 function parseCupText(allText) {
 
     removeAllCircles();
@@ -167,6 +175,28 @@ function parseCupText(allText) {
 
     // parse the CUP file (which is formatted as a CSV file)
     let result = $.csv.toObjects(allText.substring(0, taskLocation));
+    if (result.length == 0) { return };
+
+    // "result" is an array of objects.  The keys for each object are the column labels from 
+    // the first row of the CUP file, but these labels are arbitrary and not at all consistent.
+    // SeeYou creates CUP files with line 1 as follows:
+    //      name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+    //      0    1    2       3   4   5    6
+    // Turnpoint Exchange has some files with line 1 as:
+    //      Title,Code,Country,Latitude,Longitude,Elevation,Style,Direction,Length,Frequency,Description
+    //
+    // What's more, newer files have extra columns.
+    // Previous format (2018)
+    // name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc
+    //
+    // Current format
+    // name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+    //
+    // So, the fields we are reading will always have the same position, but the label will vary,
+    // and therefore the object keys will vary.
+    // "keys" defined here is passed to the LandingSpot constructor to addresses this problem.
+    let keys = Object.keys(result[0]);
+
     console.log(result[0]);
     console.log(result[result.length - 1]);
 
@@ -190,11 +220,12 @@ function parseCupText(allText) {
         // elem.innerHTML = percent + "%";
     }
 
+    let key_style = keys[INDEX_STYLE];
     // add landables first
     for (let row of result) {
         updateProgress();
-        if (row.style == OUTLANDING) {
-            let a = new LandingSpot(row, yellowOptions);
+        if (row[key_style] == OUTLANDING) {
+            let a = new LandingSpot(row, keys, yellowOptions);
             landingSpots.push(a);
         }
     }
@@ -202,8 +233,8 @@ function parseCupText(allText) {
     // airports with grass surface will be layered above landable fields
     for (let row of result) {
         updateProgress();
-        if (row.style == GRASS_SURFACE) {
-            let a = new LandingSpot(row, blueOptions);
+        if (row[key_style] == GRASS_SURFACE) {
+            let a = new LandingSpot(row, keys, blueOptions);
             landingSpots.push(a);
         }
     }
@@ -211,8 +242,8 @@ function parseCupText(allText) {
     // load ordinary airports last so they will be layered above all others
     for (let row of result) {
         updateProgress();
-        if (row.style == GLIDING_AIRFIELD || row.style == AIRPORT) {
-            let a = new LandingSpot(row, greenOptions);
+        if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
+            let a = new LandingSpot(row, keys, greenOptions);
             landingSpots.push(a);
         }
     }
@@ -221,8 +252,7 @@ function parseCupText(allText) {
     drawLandingSpots();
 };
 
-function removeAllCircles()
-{
+function removeAllCircles() {
     // Remove each circle from the map
     for (let a of landingSpots) {
         a.circle.removeFrom(map);
@@ -234,27 +264,29 @@ function removeAllCircles()
 
 // Parses an entry in a CUP file.
 // Will probably die if the file contains tasks.
-function LandingSpot(csvRecord, options) {
-    this.name = csvRecord.name;
-    this.style = csvRecord.style;
+function LandingSpot(csvRecord, keys, options) {
+
+    this.name = csvRecord[keys[INDEX_NAME]];
+    this.style = csvRecord[keys[INDEX_STYLE]];
 
     // Parse elevation
-    if (csvRecord.elev.endsWith("ft")) {
-        this.elevation = Number(csvRecord.elev.substr(0, csvRecord.elev.length - 2));
+    let elevation = csvRecord[keys[INDEX_ELEV]];
+    if (elevation.endsWith("ft")) {
+        this.elevation = Number(elevation.substr(0, elevation.length - 2));
     }
-    else if (csvRecord.elev.endsWith("m")) {
-        this.elevation = metersToFeet(Number(csvRecord.elev.substr(0, csvRecord.elev.length - 1)));
+    else if (elevation.endsWith("m")) {
+        this.elevation = metersToFeet(Number(elevation.substr(0, elevation.length - 1)));
     }
 
     // Parse lattitude
-    let s = csvRecord.lat;
+    let s = csvRecord[keys[INDEX_LAT]];;
     let degrees = Number(s.substring(0, 2));
     let minutes = Number(s.substring(2, 8));
     let sign = s.endsWith("N") ? 1 : -1;
     let lat = sign * (degrees + minutes / 60.0);
 
     // Parse longitude
-    s = csvRecord.lon;
+    s = csvRecord[keys[INDEX_LON]];;
     degrees = Number(s.substring(0, 3));
     minutes = Number(s.substring(3, 9));
     sign = s.endsWith("E") ? 1 : -1;
