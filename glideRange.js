@@ -221,33 +221,38 @@ function parseCupText(allText) {
     }
 
     let key_style = keys[INDEX_STYLE];
-    // add landables first
-    for (let row of result) {
-        updateProgress();
-        if (row[key_style] == OUTLANDING) {
-            let a = new LandingSpot(row, keys, yellowOptions);
-            landingSpots.push(a);
-        }
-    }
 
-    // airports with grass surface will be layered above landable fields
-    for (let row of result) {
-        updateProgress();
-        if (row[key_style] == GRASS_SURFACE) {
-            let a = new LandingSpot(row, keys, blueOptions);
-            landingSpots.push(a);
-        }
-    }
+    // The last item draw will appear on top of the others.
+    // But we want the first airports in the CUP file on top.
+    // So, add new items onto the front of the array instead
+    // of simply pushing them onto the end.
 
-    // load ordinary airports last so they will be layered above all others
+
+    // load ordinary airports first so they will be layered above all others
     for (let row of result) {
         updateProgress();
         if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
             let a = new LandingSpot(row, keys, greenOptions);
-            landingSpots.push(a);
+            landingSpots.unshift(a);
+        }
+    }
+    // airports with grass surface will be layered below ordinary airports
+    for (let row of result) {
+        updateProgress();
+        if (row[key_style] == GRASS_SURFACE) {
+            let a = new LandingSpot(row, keys, blueOptions);
+            landingSpots.unshift(a);
         }
     }
 
+    // add landables last so they will be displayed lowest (first in the array)
+    for (let row of result) {
+        updateProgress();
+        if (row[key_style] == OUTLANDING) {
+            let a = new LandingSpot(row, keys, yellowOptions);
+            landingSpots.unshift(a);
+        }
+    }
     // Draw the landing spots according to the selected check boxes
     drawLandingSpots();
 };
