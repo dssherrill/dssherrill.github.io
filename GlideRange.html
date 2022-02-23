@@ -1,11 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
+<!-- 
+    Copyright (c) David S. Sherrill
+    
+    This file is part of Glide Range Map.
+
+    Glide Range Map is free software: you can redistribute it and/or modify it under the terms 
+    of the GNU General Public License as published by the Free Software Foundation, either
+    version 3 of the License, or (at your option) any later version.
+
+    Glide Range Map is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; 
+    without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. 
+    See the GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along with Glide Range Map. 
+    If not, see https://www.gnu.org/licenses/.
+  -->
 
 <head>
 
     <title>Glide Range Map version 1.1</title>
     <!-- 
         Change History
+        Version 1.1.2
+        * Loads a default CUP file during initialization
+
         Version 1.1.1
         * Removed "Load file" and "Update" buttons; map now automatically updates when inputs change
         
@@ -39,6 +58,14 @@
         href="https://cdn-geoweb.s3.amazonaws.com/esri-leaflet-geocoder/0.0.1-beta.5/esri-leaflet-geocoder.css">
 
     <style>
+        html * {
+            /* font-size: 16px;
+            line-height: 1.625; */
+            font-family: Nunito, sans-serif;
+        }
+    </style>
+
+    <style>
         html,
         body {
             height: 100%;
@@ -59,15 +86,27 @@
         }
     </style>
 
+    <!-- Progress bar -->
+    <style>
+        #myProgress {
+            width: 25%;
+            background-color: #ddd;
+            /* visibility: hidden; */
+        }
+
+        #myBar {
+            width: 0%;
+            height: 20px;
+            background-color: #04AA6D;
+            text-align: center;
+            line-height: 20px;
+            color: #ddd;
+        }
+    </style>
 
 </head>
 
 <body>
-    <form id="myForm">
-        <input type="file" id="csvFile" accept=".cup" />
-    </form>
-
-    <br>
     <form id="glideParameters">
         <div id="map" style="width: 1000px; height: 600px;"></div>
 
@@ -97,6 +136,22 @@
             <label for="landableFields">Landable Fields</label>
         </div>
     </form>
+    <br>
+    <form id="myForm">
+        Use the button below to load a CUP file from your computer.
+        <br>
+        <input type="file" id="csvFile" accept=".cup" />
+    </form>
+
+    <br>
+
+    <!-- <div id="myProgress">
+        <div id="myBar" width="0%"></div>
+    </div>
+    <br>
+    <button onclick="move()">Click Me</button>
+
+    <progress id="loadProgress" value="22" max="100"></progress> -->
 
     <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.3.1.slim.js"
@@ -107,4 +162,5 @@
     <script src="glideRange.js"></script>
 
 </body>
+
 </html>
