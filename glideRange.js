@@ -94,29 +94,10 @@ const AIRPORT = 5;
 // Loads the CUP file when the "Load File" button is clicked.
 // Note that the CUP file format is a valid CSV file.
 loadFileForm.addEventListener('change', loadCupFile);
-glideParameters.addEventListener('change', drawLandingSpots);
 
-// let elem = document.getElementById("myBar");
-// let progressElement = document.getElementById("loadProgress");
-// let i = 0;
-// function move() {
-//     if (i == 0) {
-//         elem.style.visibility = "visible";
-//         i = 1;
-//         let width = 10;
-//         let id = setInterval(frame, 10);
-//         function frame() {
-//             if (width >= 100) {
-//                 clearInterval(id);
-//                 i = 0;
-//             } else {
-//                 width++;
-//                 elem.style.width = width + "%";
-//                 elem.innerHTML = width + "%";
-//             }
-//         }
-//     }
-// }
+// Updates circle sizes when the user changes any of the
+// input paramters (glide ratio, altitude, and arrival height).
+glideParameters.addEventListener('change', drawLandingSpots);
 
 // Load the default landing spots
 map.whenReady(function ()
@@ -152,9 +133,6 @@ function parseCupText(allText) {
 
     removeAllLandingSpots();
 
-    // delete tasks
-    let taskLocation = allText.indexOf("-----Related Tasks-----");
-
     glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
     altitude = parseFloat(document.getElementById('altitudeInput').value);
     arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
@@ -163,10 +141,14 @@ function parseCupText(allText) {
     let blueOptions = { color: 'black', fillColor: 'blue', opacity: 1, fillOpacity: 1 };
     let greenOptions = { color: 'black', fillColor: 'green', opacity: 1, fillOpacity: 1 };
 
-    // correct taskLocation if string not found, or other error producing NaN or undefined
+    // delete tasks
+    let taskLocation = allText.indexOf("-----Related Tasks-----");
+
+    // fix taskLocation if string not found, or other error producing NaN or undefined
     taskLocation = (~taskLocation) ? taskLocation : allText.length;
 
-    // parse the CUP file (which is formatted as a CSV file)
+    // Parse the CUP file (which is formatted as a CSV file).
+    // Stop parsing when the Task section is reached.
     let result = $.csv.toObjects(allText.substring(0, taskLocation));
     if (result.length == 0) { return };
 
@@ -199,37 +181,15 @@ function parseCupText(allText) {
     let numIterations = numGroups * numLines;
     let iteration = 0;
 
-    // elem.style.visibility = "visible";
-    // progressElement.max = numIterations;
-
-    function updateProgress() {
-        iteration++;
-        // progressElement.value = iteration;
-        // let percent = (100 * iteration / numIterations).toFixed(0);
-        // if (iteration%(numIterations/10).toFixed(0) == 0) {
-        //     console.log(percent);
-        // }
-        // elem.style.width = percent + "%";
-        // elem.innerHTML = percent + "%";
-    }
-
     let key_style = keys[INDEX_STYLE];
-
-    // The last item draw will appear on top of the others.
-    // But we want the first airports in the CUP file on top.
-    // So, add new items onto the front of the array instead
-    // of simply pushing them onto the end.
-
 
     // load ordinary airports first so they will be layered above all others
     while (result.length) {
-
         // Process the file in reverse order so that the circles for the first lines
         // will be created last and will therefore be on top of the others.
         // This allows a user to put their home airport as the first line in the 
         // CUP file to prevent it from being buried by other nearby airports.
         row = result.pop();
-        updateProgress();
         if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
             let ls = new LandingSpot(row, keys, greenOptions);
             landingSpots.push(ls);
