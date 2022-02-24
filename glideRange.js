@@ -16,6 +16,30 @@
 let sterling = L.latLng(42.426, -71.793);
 let map = L.map('map').setView(sterling, 8);
 
+let landingSpots = [];
+let Airports = L.featureGroup().addTo(map);
+let GrassStrips = L.featureGroup().addTo(map);
+let Landables = L.featureGroup().addTo(map);
+
+var overlays = {
+    "Airports": Airports,
+    "Grass Strips": GrassStrips,
+    "Landable Fields": Landables,
+};
+
+L.control.layers(null, overlays, {position: 'topleft'}).addTo(map);
+
+// Keep the landables group on the bottom
+Landables.on('add', function () {
+    Landables.bringToBack();
+});
+
+// Keep the grass stips group in the middle
+GrassStrips.on('add', function () {
+    GrassStrips.bringToBack();
+    Landables.bringToBack();
+});
+
 let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
     maxZoom: 18,
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
@@ -25,21 +49,7 @@ let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}
     zoomOffset: -1
 }).addTo(map);
 
-
-// Control 2: This add a scale to the map
 L.control.scale().addTo(map);
-
-// Control 3: This add a Search bar
-let searchControl = new L.esri.Controls.Geosearch().addTo(map);
-
-let results = new L.LayerGroup().addTo(map);
-
-searchControl.on('results', function (data) {
-    results.clearLayers();
-    for (let i = data.results.length - 1; i >= 0; i--) {
-        results.addLayer(L.marker(data.results[i].latlng));
-    }
-});
 
 let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
 let altitude = parseFloat(document.getElementById('altitudeInput').value);
@@ -58,24 +68,10 @@ function drawLandingSpots(e) {
     let altitude = parseFloat(document.getElementById('altitudeInput').value);
     let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
 
-    let inputElements = document.getElementsByClassName('messageCheckbox');
-    let airport = inputElements[0].checked;
-    let grassStrip = inputElements[1].checked;
-    let landable = inputElements[2].checked;
-
-    for (let a of landingSpots) {
-        a.circle.removeFrom(map);
-
-        radius = glideRatio * (altitude - arrivalHeight - a.elevation);
+    for (let ls of landingSpots) {
+        radius = glideRatio * (altitude - arrivalHeight - ls.elevation);
         radius = Math.max(1.0, radius);
-        a.circle.setRadius(feetToMeters(radius));
-
-        if ((a.style == OUTLANDING && landable) ||
-            (a.style == GRASS_SURFACE && grassStrip) ||
-            (a.style == AIRPORT && airport) ||
-            (a.style == GLIDING_AIRFIELD && airport)) {
-            a.circle.addTo(map);
-        }
+        ls.circle.setRadius(feetToMeters(radius));
     }
 }
 
@@ -88,11 +84,7 @@ function metersToFeet(meters) {
     return meters / 0.3048;
 }
 
-// map.on('click', onMapClick);
-
-let landingSpots = [];
-
-const myForm = document.getElementById("myForm");
+const loadFileForm = document.getElementById("loadFileForm");
 const csvFile = document.getElementById("csvFile");
 const GRASS_SURFACE = 2;
 const OUTLANDING = 3;
@@ -101,9 +93,7 @@ const AIRPORT = 5;
 
 // Loads the CUP file when the "Load File" button is clicked.
 // Note that the CUP file format is a valid CSV file.
-myForm.addEventListener('change', loadCupFile);
-myForm.addEventListener("submit", loadCupFile);
-
+loadFileForm.addEventListener('change', loadCupFile);
 glideParameters.addEventListener('change', drawLandingSpots);
 
 // let elem = document.getElementById("myBar");
@@ -129,9 +119,12 @@ glideParameters.addEventListener('change', drawLandingSpots);
 // }
 
 // Load the default landing spots
-fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
+map.whenReady(function ()
+{
+    fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
     .then(response => response.text())
     .then(data => parseCupText(data));
+});
 
 function loadCupFile(e) {
     e.preventDefault();
@@ -157,7 +150,7 @@ const INDEX_STYLE = 6;
 
 function parseCupText(allText) {
 
-    removeAllCircles();
+    removeAllLandingSpots();
 
     // delete tasks
     let taskLocation = allText.indexOf("-----Related Tasks-----");
@@ -229,46 +222,56 @@ function parseCupText(allText) {
 
 
     // load ordinary airports first so they will be layered above all others
-    for (let row of result) {
+    while (result.length) {
+
+        // Process the file in reverse order so that the circles for the first lines
+        // will be created last and will therefore be on top of the others.
+        // This allows a user to put their home airport as the first line in the 
+        // CUP file to prevent it from being buried by other nearby airports.
+        row = result.pop();
         updateProgress();
         if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
-            let a = new LandingSpot(row, keys, greenOptions);
-            landingSpots.unshift(a);
+            let ls = new LandingSpot(row, keys, greenOptions);
+            landingSpots.push(ls);
+            ls.circle.addTo(Airports);
         }
-    }
-    // airports with grass surface will be layered below ordinary airports
-    for (let row of result) {
-        updateProgress();
-        if (row[key_style] == GRASS_SURFACE) {
-            let a = new LandingSpot(row, keys, blueOptions);
-            landingSpots.unshift(a);
+        else if (row[key_style] == GRASS_SURFACE) {
+            let ls = new LandingSpot(row, keys, blueOptions);
+            landingSpots.push(ls);
+            ls.circle.addTo(GrassStrips);
+        }
+        else if (row[key_style] == OUTLANDING) {
+            let ls = new LandingSpot(row, keys, yellowOptions);
+            landingSpots.push(ls);
+            ls.circle.addTo(Landables);
         }
     }
 
-    // add landables last so they will be displayed lowest (first in the array)
-    for (let row of result) {
-        updateProgress();
-        if (row[key_style] == OUTLANDING) {
-            let a = new LandingSpot(row, keys, yellowOptions);
-            landingSpots.unshift(a);
-        }
-    }
-    // Draw the landing spots according to the selected check boxes
-    drawLandingSpots();
+    // Force the layer order to be
+    //  Airports (on top)
+    //  Grass Strips
+    //  Landable Fields
+    GrassStrips.bringToBack();
+    Landables.bringToBack();
+
+    map.fitBounds(Airports.getBounds());
 };
 
-function removeAllCircles() {
-    // Remove each circle from the map
-    for (let a of landingSpots) {
-        a.circle.removeFrom(map);
+// Remove all landing spots before loading a new CUP file
+function removeAllLandingSpots() {
+    // Remove circles from the map
+    for (ls of landingSpots) {
+        let c = ls.circle;
+        c.removeFrom(Airports);
+        c.removeFrom(GrassStrips);
+        c.removeFrom(Landables);
     }
 
-    // Remove all circles from the array
+    // Remove all landing spots from the array
     landingSpots.length = 0;
 }
 
 // Parses an entry in a CUP file.
-// Will probably die if the file contains tasks.
 function LandingSpot(csvRecord, keys, options) {
 
     this.name = csvRecord[keys[INDEX_NAME]];
@@ -284,17 +287,17 @@ function LandingSpot(csvRecord, keys, options) {
     }
 
     // Parse lattitude
-    let s = csvRecord[keys[INDEX_LAT]];;
-    let degrees = Number(s.substring(0, 2));
-    let minutes = Number(s.substring(2, 8));
-    let sign = s.endsWith("N") ? 1 : -1;
+    let valueText = csvRecord[keys[INDEX_LAT]];;
+    let degrees = Number(valueText.substring(0, 2));
+    let minutes = Number(valueText.substring(2, 8));
+    let sign = valueText.endsWith("N") ? 1 : -1;
     let lat = sign * (degrees + minutes / 60.0);
 
     // Parse longitude
-    s = csvRecord[keys[INDEX_LON]];;
-    degrees = Number(s.substring(0, 3));
-    minutes = Number(s.substring(3, 9));
-    sign = s.endsWith("E") ? 1 : -1;
+    valueText = csvRecord[keys[INDEX_LON]];;
+    degrees = Number(valueText.substring(0, 3));
+    minutes = Number(valueText.substring(3, 9));
+    sign = valueText.endsWith("E") ? 1 : -1;
     let lon = sign * (degrees + minutes / 60.0);
 
     this.latLng = L.latLng(lat, lon);

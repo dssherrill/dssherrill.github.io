@@ -114,8 +114,9 @@
 </head>
 
 <body>
+    <div id="map" style="width: 1000px; height: 600px;"></div>
+
     <form id="glideParameters">
-        <div id="map" style="width: 1000px; height: 600px;"></div>
 
         <!-- <form id="options"> -->
         <label for="glideRatioInput">Glide Ratio</label> <input type="number" value="20" min="0" id="glideRatioInput"
@@ -126,25 +127,9 @@
         <br>
         <label for="arrivalHeightInput">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
             id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
-        <br>
-
-        <div>
-            <input class="messageCheckbox" type="checkbox" id="airports" name="fieldType" checked>
-            <label for="airports">Airports</label>
-        </div>
-
-        <div>
-            <input class="messageCheckbox" type="checkbox" id="grassStrips" name="fieldType">
-            <label for="grassStrips">Grass Strips</label>
-        </div>
-
-        <div>
-            <input class="messageCheckbox" type="checkbox" id="landableFields" name="fieldType">
-            <label for="landableFields">Landable Fields</label>
-        </div>
     </form>
     <br>
-    <form id="myForm">
+    <form id="loadFileForm">
         Use the button below to load a CUP file from your computer.
         <br>
         <input type="file" id="csvFile" accept=".cup" />
