@@ -16,18 +16,27 @@
 let sterling = L.latLng(42.426, -71.793);
 let map = L.map('map').setView(sterling, 8);
 
+// var popup = L.popup()
+// .setLatLng(sterling)
+// .setContent('I am a standalone popup.')
+// .openOn(map);
+
 let landingSpots = [];
 let Airports = L.featureGroup().addTo(map);
 let GrassStrips = L.featureGroup().addTo(map);
 let Landables = L.featureGroup().addTo(map);
 
 var overlays = {
-    "Airports": Airports,
-    "Grass Strips": GrassStrips,
-    "Landable Fields": Landables,
+    '<i style="background: #AAC896"/> Airports': Airports,
+    '<i style="background: #AAAADC"/> Grass Strips': GrassStrips,
+    '<i style="background: #E6E696"/> Landable Fields': Landables,
 };
 
-L.control.layers(null, overlays, {position: 'topleft'}).addTo(map);
+L.control.layers(null, overlays, { position: 'topleft' }).addTo(map);
+
+// Open the layer control to reveal the legend for circle colors.
+// The control will close the first time it loses focus.
+$(".leaflet-control-layers").addClass("leaflet-control-layers-expanded");
 
 // Keep the landables group on the bottom
 Landables.on('add', function () {
@@ -100,11 +109,10 @@ loadFileForm.addEventListener('change', loadCupFile);
 glideParameters.addEventListener('change', drawLandingSpots);
 
 // Load the default landing spots
-map.whenReady(function ()
-{
+map.whenReady(function () {
     fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
-    .then(response => response.text())
-    .then(data => parseCupText(data));
+        .then(response => response.text())
+        .then(data => parseCupText(data));
 });
 
 function loadCupFile(e) {
