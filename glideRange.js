@@ -231,7 +231,10 @@ function removeAllLandingSpots() {
 }
 
 // Parses an entry in a CUP file.
+// The 2018 format is described here:
 // https://downloads.naviter.com/docs/CUP-file-format-description.pdf
+// But Naviter has updated the format since then.  
+// See the lengthy comment in "function parseCupText(allText)"
 class LandingSpot {
     constructor(csvRecord, keys, options) {
 
