@@ -262,7 +262,7 @@ class LandingSpot {
 
         // Parse longitude
         // Format:   dddmm.mmm{E|W}
-        // Example:  01410.467E is equal to 014° 10.467' E
+        // Example:  01410.467E is equal to 014° 10.467' East
         valueText = csvRecord[keys[INDEX_LON]];
         degrees = Number(valueText.substring(0, 3));
         minutes = Number(valueText.substring(3, 9));
