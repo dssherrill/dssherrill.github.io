@@ -16,7 +16,7 @@
 /*jshint esversion: 6 */
 
 let sterling = L.latLng(42.426, -71.793);
-let map = L.map('map').setView(sterling,-1);
+let map = L.map('map').setView(sterling, -1);
 
 let landingSpots = [];
 let Airports = L.featureGroup().addTo(map);
@@ -43,14 +43,14 @@ let tooltip = L.tooltip({
     noWrap: true,
     opacity: 1.0
 });
-tooltip.setContent( "Hover on the Layers control (at left) to filter landing sites by type." +
+tooltip.setContent("Hover on the Layers control (at left) to filter landing sites by type." +
     "<br>Use the button below the map to load another CUP file." +
-    "<br>Click this box to close it." );
+    "<br>Click this box to close it.");
 tooltip.setLatLng(map.getCenter());
 tooltip.addTo(map);
 
 let el = tooltip.getElement();
-el.addEventListener('click', function() { tooltip.remove(); });
+el.addEventListener('click', function () { tooltip.remove(); });
 el.style.pointerEvents = 'auto';
 
 // Keep the landables group on the bottom
@@ -85,10 +85,31 @@ function drawLandingSpots(e) {
     let altitude = parseFloat(document.getElementById('altitudeInput').value);
     let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
 
+    // Save the form inputs
+    localStorage.setItem('glideRatio', glideRatio);
+    localStorage.setItem('altitude', altitude);
+    localStorage.setItem('arrivalHeight', arrivalHeight);
+
     for (let ls of landingSpots) {
         radius = glideRatio * (altitude - arrivalHeight - ls.elevation);
         radius = Math.max(1.0, radius);
         ls.circle.setRadius(feetToMeters(radius));
+    }
+}
+
+// reload the last set of form inputs
+function restoreGlideParameters() {
+    loadStoredValue('glideRatio', 'glideRatioInput');
+    loadStoredValue('altitude', 'altitudeInput');
+    loadStoredValue('arrivalHeight', 'arrivalHeightInput');
+}
+
+// reload a single form input
+function loadStoredValue(storageKey, htmlId) {
+    // check whether the 'name' data item is stored in web Storage
+    let storedText = localStorage.getItem(storageKey);
+    if (storedText) {
+        document.getElementById(htmlId).value = parseFloat(storedText);
     }
 }
 
@@ -121,7 +142,11 @@ glideParameters.addEventListener('change', drawLandingSpots);
 map.whenReady(function () {
     fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
         .then(response => response.text())
-        .then(data => parseCupText(data));
+        .then(data => {
+            restoreGlideParameters();
+            parseCupText(data);
+        });
+
 });
 
 function loadCupFile(e) {
@@ -150,6 +175,7 @@ function parseCupText(allText) {
 
     removeAllLandingSpots();
 
+    // TODO: these are passed to the LandingSpot constructor as globals.  That is wrong.
     glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
     altitude = parseFloat(document.getElementById('altitudeInput').value);
     arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
@@ -191,12 +217,6 @@ function parseCupText(allText) {
 
     console.log(result[0]);
     console.log(result[result.length - 1]);
-
-
-    let numLines = result.length;
-    let numGroups = 3;
-    let numIterations = numGroups * numLines;
-    let iteration = 0;
 
     let key_style = keys[INDEX_STYLE];
 
