@@ -16,14 +16,14 @@
 /*jshint esversion: 6 */
 
 let sterling = L.latLng(42.426, -71.793);
-let map = L.map('map').setView(sterling, 8);
+let map = L.map('map').setView(sterling,-1);
 
 let landingSpots = [];
 let Airports = L.featureGroup().addTo(map);
 let GrassStrips = L.featureGroup().addTo(map);
 let Landables = L.featureGroup().addTo(map);
 
-var overlays = {
+let overlays = {
     '<i style="background: #AAC896"/> Airports': Airports,
     '<i style="background: #AAAADC"/> Grass Strips': GrassStrips,
     '<i style="background: #E6E696"/> Landable Fields': Landables,
@@ -34,6 +34,24 @@ L.control.layers(null, overlays, { position: 'topleft' }).addTo(map);
 // Open the layer control to reveal the legend for circle colors.
 // The control will close the first time it loses focus.
 $(".leaflet-control-layers").addClass("leaflet-control-layers-expanded");
+
+// Display instructions in a Tooltip box when this page first loads.
+let tooltip = L.tooltip({
+    direction: 'center',
+    permanent: true,
+    interactive: true,
+    noWrap: true,
+    opacity: 1.0
+});
+tooltip.setContent( "Hover on the Layers control (at left) to filter landing sites by type." +
+    "<br>Use the button below the map to load another CUP file." +
+    "<br>Click this box to close it." );
+tooltip.setLatLng(map.getCenter());
+tooltip.addTo(map);
+
+let el = tooltip.getElement();
+el.addEventListener('click', function() { tooltip.remove(); });
+el.style.pointerEvents = 'auto';
 
 // Keep the landables group on the bottom
 Landables.on('add', function () {

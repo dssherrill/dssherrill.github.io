@@ -96,6 +96,22 @@
             max-width: 100%;
             max-height: 100%;
         }
+
+        .leaflet-tooltip {
+            position: absolute;
+            padding: 6px;
+            background-color: #fff;
+            border: 2px solid #fff;
+            border-radius: 5px;
+            color: #222;
+            white-space: nowrap;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+            pointer-events: none;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 1.0);
+        }
     </style>
 
     <style>
@@ -109,35 +125,34 @@
 <body>
     <div id="map" style="width: 1000px; height: 600px;"></div>
 
-    <form id="glideParameters">
+    <div id="inputsDiv">
+        <form id="glideParameters">
 
-        <!-- <form id="options"> -->
-        <label for="glideRatioInput">Glide Ratio</label> <input type="number" value="20" min="0" id="glideRatioInput"
-            name="glideRatioInput" autofocus />
+            <!-- <form id="options"> -->
+            <label for="glideRatioInput">Glide Ratio</label> <input type="number" value="20" min="0"
+                id="glideRatioInput" name="glideRatioInput" autofocus />
+            <br>
+            <label for="altitudeInput">Altitude MSL (ft)</label> <input type="number" value="3500" min="0"
+                id="altitudeInput" name="altitudeInput" autofocus />
+            <br>
+            <label for="arrivalHeightInput">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
+                id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
+        </form>
         <br>
-        <label for="altitudeInput">Altitude MSL (ft)</label> <input type="number" value="3500" min="0"
-            id="altitudeInput" name="altitudeInput" autofocus />
+        <form id="loadFileForm">
+            Load a CUP file: <input type="file" id="csvFile" accept=".cup" />
+        </form>
+
         <br>
-        <label for="arrivalHeightInput">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
-            id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
-    </form>
-    <br>
-    <form id="loadFileForm">
-        Use the button below to load a CUP file from your computer.
-        <br>
-        <input type="file" id="csvFile" accept=".cup" />
-    </form>
 
-    <br>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.js"
+            integrity="sha256-fNXJFIlca05BIO2Y5zh1xrShK3ME+/lYZ0j+ChxX2DA=" crossorigin="anonymous"></script>
+        <script src="jquery.csv.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
 
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.js"
-        integrity="sha256-fNXJFIlca05BIO2Y5zh1xrShK3ME+/lYZ0j+ChxX2DA=" crossorigin="anonymous"></script>
-    <script src="jquery.csv.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
-
-    <script src="glideRange.js"></script>
-
+        <script src="glideRange.js"></script>
+    </div>
 </body>
 
 </html>
