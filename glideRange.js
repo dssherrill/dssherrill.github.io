@@ -120,14 +120,14 @@ let tooltip = L.tooltip({
 });
 
 tooltip.setContent(
-    "NOTICE: the glide range circles ignore blocking terrain." +
+    "<strong>NOTICE: The range circles ignore blocking terrain</strong>" +
     "<br>"+
     "<ul>" +
-    "<li>Hover on the Layers control (near top-left) to filter landing sites by type." +
-    "<li>Use the button below the map to load another CUP file." +
-    "<li>Click this box to dismiss it."+
+    "<li>Hover on the Layers control (near top-left)<br>to filter landing sites by type" +
+    "<li>Adjust the soaring parameters (below map)" +
+    "<li>Use the button to load your CUP file (optional)" +
+    "<li>Click this box to dismiss it"+
     "</ul>" +
-    "<br>" +
     "Contact:  soarer@sherrill.in"
     );
 
