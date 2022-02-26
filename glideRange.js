@@ -15,8 +15,83 @@
 
 /*jshint esversion: 6 */
 
+// Clear stored entries on reset request
+const paramsString = window.location.search;
+let searchParams = new URLSearchParams(paramsString);
+if (searchParams.has('reset')) {
+    localStorage.removeItem("glideRatio");
+    localStorage.removeItem("altitude");
+    localStorage.removeItem("arrivalHeight");
+    localStorage.removeItem("landingSpots");
+}
+
+// These address the unpredictable column labels in the CUP file, as described
+// in the lengthy comment (below) in "function parseCupText(allText)"
+const INDEX_NAME = 0;
+const INDEX_LAT = 3;
+const INDEX_LON = 4;
+const INDEX_ELEV = 5;
+const INDEX_STYLE = 6;
+
+let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
+let altitude = parseFloat(document.getElementById('altitudeInput').value);
+let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+
+// Parses an entry in a CUP file.
+// The 2018 format is described here:
+// https://downloads.naviter.com/docs/CUP-file-format-description.pdf
+// But Naviter has updated the format since then.  
+// See the lengthy comment in "function parseCupText(allText)"
+class LandingSpot {
+    constructor(csvRecord, keys, options) {
+
+        this.name = csvRecord[keys[INDEX_NAME]];
+        this.style = csvRecord[keys[INDEX_STYLE]];
+
+        // Parse elevation
+        // Format:  Number with an attached unit. Unit can be either "m" for meters or "ft" for feet.
+        let elevation = csvRecord[keys[INDEX_ELEV]];
+        if (elevation.endsWith("ft")) {
+            this.elevation = Number(elevation.substr(0, elevation.length - 2));
+        }
+        else if (elevation.endsWith("m")) {
+            this.elevation = metersToFeet(Number(elevation.substr(0, elevation.length - 1)));
+        }
+
+        // Parse lattitude
+        // Format:   ddmm.mmm{N|S}
+        // Example: "5107.830N" is equal to 51° 07.830' North
+        let valueText = csvRecord[keys[INDEX_LAT]];
+        let degrees = Number(valueText.substring(0, 2));
+        let minutes = Number(valueText.substring(2, 8));
+        let sign = valueText.endsWith("N") ? 1 : -1;
+        let lat = sign * (degrees + minutes / 60.0);
+
+        // Parse longitude
+        // Format:   dddmm.mmm{E|W}
+        // Example:  01410.467E is equal to 014° 10.467' East
+        valueText = csvRecord[keys[INDEX_LON]];
+        degrees = Number(valueText.substring(0, 3));
+        minutes = Number(valueText.substring(3, 9));
+        sign = valueText.endsWith("E") ? 1 : -1;
+        let lon = sign * (degrees + minutes / 60.0);
+
+        this.latLng = L.latLng(lat, lon);
+        let radius = glideRatio * (altitude - arrivalHeight - this.elevation);
+        options.radius = feetToMeters(radius);
+
+        if (isNaN(radius)) {
+            console.log(this.name + "radius is NaN");
+        }
+        else {
+            this.circle = L.circle(this.latLng,
+                options).bindPopup(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
+        }
+    }
+}
+
 let sterling = L.latLng(42.426, -71.793);
-let map = L.map('map').setView(sterling, -1);
+let map = L.map('map', {maxZoom: 13}).setView(sterling, 9);
 
 let landingSpots = [];
 let Airports = L.featureGroup().addTo(map);
@@ -43,9 +118,19 @@ let tooltip = L.tooltip({
     noWrap: true,
     opacity: 1.0
 });
-tooltip.setContent("Hover on the Layers control (at left) to filter landing sites by type." +
-    "<br>Use the button below the map to load another CUP file." +
-    "<br>Click this box to close it.");
+
+tooltip.setContent(
+    "NOTICE: the glide range circles ignore blocking terrain." +
+    "<br>"+
+    "<ul>" +
+    "<li>Hover on the Layers control (near top-left) to filter landing sites by type." +
+    "<li>Use the button below the map to load another CUP file." +
+    "<li>Click this box to dismiss it."+
+    "</ul>" +
+    "<br>" +
+    "Contact:  soarer@sherrill.in"
+    );
+
 tooltip.setLatLng(map.getCenter());
 tooltip.addTo(map);
 
@@ -64,7 +149,7 @@ GrassStrips.on('add', function () {
     Landables.bringToBack();
 });
 
-let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw', {
+let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
     maxZoom: 18,
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
         'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -74,10 +159,6 @@ let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}
 }).addTo(map);
 
 L.control.scale().addTo(map);
-
-let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
-let altitude = parseFloat(document.getElementById('altitudeInput').value);
-let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
 
 // Updates the radius of the circle for every landing spot using the parameters read from the form
 function drawLandingSpots(e) {
@@ -140,13 +221,22 @@ glideParameters.addEventListener('change', drawLandingSpots);
 
 // Load the default landing spots
 map.whenReady(function () {
-    fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
-        .then(response => response.text())
-        .then(data => {
-            restoreGlideParameters();
-            parseCupText(data);
-        });
-
+    // Try to reload the stored copy of the CUP file
+    let allText = localStorage.getItem('landingSpots');
+    if (allText) {
+        parseCupText(allText);
+        restoreGlideParameters();
+        drawLandingSpots();
+    }
+    else {
+        // Nothing has been stored.  Load the default CUP file
+        fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
+            .then(response => response.text())
+            .then(data => {
+                restoreGlideParameters();
+                parseCupText(data);
+            });
+    }
 });
 
 function loadCupFile(e) {
@@ -158,18 +248,11 @@ function loadCupFile(e) {
     reader.onload = function (e) {
         const allText = e.target.result;
         parseCupText(allText);
+        localStorage.setItem('landingSpots', allText);
     };
 
     reader.readAsText(input);
 }
-
-// These address the unpredictable column labels in the CUP file, as described
-// in the large comment below.
-const INDEX_NAME = 0;
-const INDEX_LAT = 3;
-const INDEX_LON = 4;
-const INDEX_ELEV = 5;
-const INDEX_STYLE = 6;
 
 function parseCupText(allText) {
 
@@ -251,7 +334,31 @@ function parseCupText(allText) {
     GrassStrips.bringToBack();
     Landables.bringToBack();
 
-    map.fitBounds(Airports.getBounds());
+    // map.fitBounds(Airports.getBounds());
+
+    // Center the map on the set of all landing spots
+    try {
+        let bounds = Airports.getBounds().extend(GrassStrips.getBounds()).extend(Landables.getBounds());
+        map.fitBounds(bounds);
+        tooltip.setLatLng(bounds.getCenter());
+    }
+    // An error occurred while computing the bounds.  Airports contains only one circle.
+    catch (e) {
+        if (landingSpots.length > 0) {
+            let ls = landingSpots[0];
+            if (ls) {
+                let center = landingSpots[0].circle.getLatLng();
+                map.setView(center, 10);
+                tooltip.setLatLng(center);
+            }
+        }
+    }
+
+    tooltip.addTo(map);
+
+    // Open the layer control to reveal the legend for circle colors.
+    // The control will close the first time it loses focus.
+    $(".leaflet-control-layers").addClass("leaflet-control-layers-expanded");
 }
 
 // Remove all landing spots before loading a new CUP file
@@ -268,55 +375,3 @@ function removeAllLandingSpots() {
     landingSpots.length = 0;
 }
 
-// Parses an entry in a CUP file.
-// The 2018 format is described here:
-// https://downloads.naviter.com/docs/CUP-file-format-description.pdf
-// But Naviter has updated the format since then.  
-// See the lengthy comment in "function parseCupText(allText)"
-class LandingSpot {
-    constructor(csvRecord, keys, options) {
-
-        this.name = csvRecord[keys[INDEX_NAME]];
-        this.style = csvRecord[keys[INDEX_STYLE]];
-
-        // Parse elevation
-        // Format:  Number with an attached unit. Unit can be either "m" for meters or "ft" for feet.
-        let elevation = csvRecord[keys[INDEX_ELEV]];
-        if (elevation.endsWith("ft")) {
-            this.elevation = Number(elevation.substr(0, elevation.length - 2));
-        }
-        else if (elevation.endsWith("m")) {
-            this.elevation = metersToFeet(Number(elevation.substr(0, elevation.length - 1)));
-        }
-
-        // Parse lattitude
-        // Format:   ddmm.mmm{N|S}
-        // Example: "5107.830N" is equal to 51° 07.830' North
-        let valueText = csvRecord[keys[INDEX_LAT]];
-        let degrees = Number(valueText.substring(0, 2));
-        let minutes = Number(valueText.substring(2, 8));
-        let sign = valueText.endsWith("N") ? 1 : -1;
-        let lat = sign * (degrees + minutes / 60.0);
-
-        // Parse longitude
-        // Format:   dddmm.mmm{E|W}
-        // Example:  01410.467E is equal to 014° 10.467' East
-        valueText = csvRecord[keys[INDEX_LON]];
-        degrees = Number(valueText.substring(0, 3));
-        minutes = Number(valueText.substring(3, 9));
-        sign = valueText.endsWith("E") ? 1 : -1;
-        let lon = sign * (degrees + minutes / 60.0);
-
-        this.latLng = L.latLng(lat, lon);
-        let radius = glideRatio * (altitude - arrivalHeight - this.elevation);
-        options.radius = feetToMeters(radius);
-
-        if (isNaN(radius)) {
-            console.log(this.name + "radius is NaN");
-        }
-        else {
-            this.circle = L.circle(this.latLng,
-                options).bindPopup(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
-        }
-    }
-}
