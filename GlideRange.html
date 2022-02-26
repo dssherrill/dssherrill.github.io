@@ -79,7 +79,7 @@
         html,
         body {
             height: 100%;
-            margin: 0;
+            margin: 0
         }
 
         ul {
@@ -129,25 +129,22 @@
 <body>
     <div id="map" style="width: 1000px; height: 600px;"></div>
 
-    <div id="inputsDiv">
+    <div id="inputsDiv" sytle="margin: 5px;">
         <form id="glideParameters">
 
             <!-- <form id="options"> -->
-            <label for="glideRatioInput">Glide Ratio</label> <input type="number" value="20" min="0"
+            <label for="glideRatioInput" style="margin: 12px">Glide Ratio</label> <input type="number" value="20" min="0"
                 id="glideRatioInput" name="glideRatioInput" autofocus />
             <br>
-            <label for="altitudeInput">Altitude MSL (ft)</label> <input type="number" value="3500" min="0"
+            <label for="altitudeInput" style="margin: 12px">Altitude MSL (ft)</label> <input type="number" value="3500" min="0"
                 id="altitudeInput" name="altitudeInput" autofocus />
             <br>
-            <label for="arrivalHeightInput">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
+            <label for="arrivalHeightInput" style="margin: 12px">Arrival Height (ft)</label> <input type="number" value="1000" min="0"
                 id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
         </form>
-        <br>
-        <form id="loadFileForm">
+        <form id="loadFileForm" style="margin: 12px">
             Load a CUP file: <input type="file" id="csvFile" accept=".cup" />
         </form>
-
-        <br>
 
         <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
         <script src="https://code.jquery.com/jquery-3.3.1.slim.js"
