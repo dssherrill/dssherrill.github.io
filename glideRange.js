@@ -84,14 +84,25 @@ class LandingSpot {
             console.log(this.name + "radius is NaN");
         }
         else {
-            this.circle = L.circle(this.latLng,
-                options).bindPopup(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
+            // opoup().setLatLng does not work; still pops up at mouse click instead of circle center
+            let pop = L.popup().setLatLng(this.latLng).setContent(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
+            this.circle = L.circle(this.latLng, options);
+            pop.circle = this.circle;
+            this.circle.bindPopup(pop);
         }
     }
 }
 
 let sterling = L.latLng(42.426, -71.793);
-let map = L.map('map', {maxZoom: 13}).setView(sterling, 9);
+let map = L.map('map', { maxZoom: 18 }).setView(sterling, 9);
+
+map.on('popupopen', function (e) {
+    // If this is a Landing Spot popup, locate it on the circle center instead of the mouse click
+    if (e.popup.circle) {
+        try { e.popup.setLatLng(e.popup.circle.getLatLng()); }
+        catch (obj) { console.log("Repositioning circle failed for " + e); }
+    }
+});
 
 let landingSpots = [];
 let Airports = L.featureGroup().addTo(map);
@@ -121,15 +132,15 @@ let tooltip = L.tooltip({
 
 tooltip.setContent(
     "<strong>NOTICE: The range circles ignore blocking terrain</strong>" +
-    "<br>"+
+    "<br>" +
     "<ul>" +
     "<li>Hover on the Layers control (near top-left)<br>to filter landing sites by type" +
     "<li>Adjust the soaring parameters (below map)" +
     "<li>Use the button to load your CUP file (optional)" +
-    "<li>Click this box to dismiss it"+
+    "<li>Click this box to dismiss it" +
     "</ul>" +
     "Contact:  soarer@sherrill.in"
-    );
+);
 
 tooltip.setLatLng(map.getCenter());
 tooltip.addTo(map);
@@ -149,6 +160,9 @@ GrassStrips.on('add', function () {
     Landables.bringToBack();
 });
 
+
+// mapbox://styles/dssherrill/cl05wlw12001u15o5l91zzmjk
+// pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ
 let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
     maxZoom: 18,
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
@@ -157,6 +171,15 @@ let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}
     tileSize: 512,
     zoomOffset: -1
 }).addTo(map);
+
+// let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
+//     maxZoom: 18,
+//     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
+//         'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
+//     id: 'mapbox/streets-v11',
+//     tileSize: 512,
+//     zoomOffset: -1
+// }).addTo(map);
 
 L.control.scale().addTo(map);
 
