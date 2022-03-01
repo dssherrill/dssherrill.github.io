@@ -26,7 +26,7 @@ if (searchParams.has('reset')) {
 }
 
 // These address the unpredictable column labels in the CUP file, as described
-// in the lengthy comment (below) in "function parseCupText(allText)"
+// in the lengthy comment (below) in "function processCupData(allText)"
 const INDEX_NAME = 0;
 const INDEX_LAT = 3;
 const INDEX_LON = 4;
@@ -57,19 +57,35 @@ function getGlideParams() {
 }
 
 // Parses an entry in a CUP file.
-// The 2018 format is described here:
+// The following link describes the 2018 format:
 // https://downloads.naviter.com/docs/CUP-file-format-description.pdf
-// But Naviter has updated the format since then.  
-// See the lengthy comment in "function parseCupText(allText)"
+// But Naviter has updated the format since then, so we must deal with 2 formats.
+// Both formats are CSV files (comma separated values) and conform to the CSV standard.
+// It is the column assignments that differ.
+//
+// The 2018 format is
+//      name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc
+//      0    1    2       3   4   5    6     7     8     9    10 
+//
+// The current version of SeeYou uses this format (notice that freq moves from index 9 to 10):
+//      name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
+//      0    1    2       3   4   5    6     7     8     9       10   11   12       13
+//
+// Turnpoint Exchange has some files with line 1 as:
+//      Title,Code,Country,Latitude,Longitude,Elevation,Style,Direction,Length,Frequency,Description
+//
+// As it turns out, the fields we are reading will always have the same position, and we can ignore the labels
+//
 class LandingSpot {
-    constructor(csvRecord, keys, glideParams, options) {
+    constructor(csvRecord) {
+        let values = Object.values(csvRecord);
 
-        this.name = csvRecord[keys[INDEX_NAME]];
-        this.style = csvRecord[keys[INDEX_STYLE]];
+        this.name = values[INDEX_NAME];
+        this.style = values[INDEX_STYLE];
 
-        // Parse elevation
+        // Parse elevation and convert to feet if needed
         // Format:  Number with an attached unit. Unit can be either "m" for meters or "ft" for feet.
-        let elevation = csvRecord[keys[INDEX_ELEV]];
+        let elevation = values[INDEX_ELEV];
         if (elevation.endsWith("ft")) {
             this.elevation = Number(elevation.substr(0, elevation.length - 2));
         }
@@ -80,7 +96,7 @@ class LandingSpot {
         // Parse lattitude
         // Format:   ddmm.mmm{N|S}
         // Example: "5107.830N" is equal to 51° 07.830' North
-        let valueText = csvRecord[keys[INDEX_LAT]];
+        let valueText = values[INDEX_LAT];
         let degrees = Number(valueText.substring(0, 2));
         let minutes = Number(valueText.substring(2, 8));
         let sign = valueText.endsWith("N") ? 1 : -1;
@@ -89,21 +105,14 @@ class LandingSpot {
         // Parse longitude
         // Format:   dddmm.mmm{E|W}
         // Example:  01410.467E is equal to 014° 10.467' East
-        valueText = csvRecord[keys[INDEX_LON]];
+        valueText = values[INDEX_LON];
         degrees = Number(valueText.substring(0, 3));
         minutes = Number(valueText.substring(3, 9));
         sign = valueText.endsWith("E") ? 1 : -1;
         let lon = sign * (degrees + minutes / 60.0);
 
         this.latLng = L.latLng(lat, lon);
-        options.radius = glideParams.radius(this.elevation);
-
-        // popup().setLatLng(this.latLng) does not work; still pops up at mouse click instead of circle center
-        let pop = L.popup().setLatLng(this.latLng).setContent(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
-        this.circle = L.circle(this.latLng, options);
-
-        pop.fixedLatLng = this.latLng;  
-        this.circle.bindPopup(pop);
+        this.circle = NaN;
     }
 }
 
@@ -252,7 +261,7 @@ map.whenReady(function () {
     // Try to reload the stored copy of the CUP file
     let allText = localStorage.getItem('landingSpots');
     if (allText) {
-        parseCupText(allText);
+        processCupData(allText);
         restoreGlideParameters();
         drawLandingSpots();
     }
@@ -262,7 +271,7 @@ map.whenReady(function () {
             .then(response => response.text())
             .then(data => {
                 restoreGlideParameters();
-                parseCupText(data);
+                processCupData(data);
             });
     }
 });
@@ -275,14 +284,14 @@ function loadCupFile(e) {
 
     reader.onload = function (e) {
         const allText = e.target.result;
-        parseCupText(allText);
+        processCupData(allText);
         localStorage.setItem('landingSpots', allText);
     };
 
     reader.readAsText(input);
 }
 
-function parseCupText(allText) {
+function processCupData(allText) {
 
     removeAllLandingSpots();
 
@@ -292,10 +301,11 @@ function parseCupText(allText) {
     let blueOptions = { color: 'black', fillColor: 'blue', opacity: 1, fillOpacity: 1 };
     let greenOptions = { color: 'black', fillColor: 'green', opacity: 1, fillOpacity: 1 };
 
-    // delete tasks
+    // find the task section and ignore everything in the file from there on
     let taskLocation = allText.indexOf("-----Related Tasks-----");
 
-    // fix taskLocation if string not found, or other error producing NaN or undefined
+    // if string not found (or other error producing NaN or undefined)
+    // then process the entire file
     taskLocation = (~taskLocation) ? taskLocation : allText.length;
 
     // Parse the CUP file (which is formatted as a CSV file).
@@ -303,30 +313,8 @@ function parseCupText(allText) {
     let result = $.csv.toObjects(allText.substring(0, taskLocation));
     if (result.length == 0) { return; }
 
-    // "result" is an array of objects.  The keys for each object are the column labels from 
-    // the first row of the CUP file, but these labels are arbitrary and not at all consistent.
-    // SeeYou creates CUP files with line 1 as follows:
-    //      name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
-    //      0    1    2       3   4   5    6
-    // Turnpoint Exchange has some files with line 1 as:
-    //      Title,Code,Country,Latitude,Longitude,Elevation,Style,Direction,Length,Frequency,Description
-    //
-    // What's more, newer files have extra columns.
-    // Previous format (2018)
-    // name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc
-    //
-    // Current format
-    // name,code,country,lat,lon,elev,style,rwdir,rwlen,rwwidth,freq,desc,userdata,pics
-    //
-    // So, the fields we are reading will always have the same position, but the label will vary,
-    // and therefore the object keys will vary.
-    // "keys" defined here is passed to the LandingSpot constructor to addresses this problem.
-    let keys = Object.keys(result[0]);
-
     console.log(result[0]);
     console.log(result[result.length - 1]);
-
-    let key_style = keys[INDEX_STYLE];
 
     // load ordinary airports first so they will be layered above all others
     while (result.length) {
@@ -335,21 +323,36 @@ function parseCupText(allText) {
         // This allows a user to put their home airport as the first line in the 
         // CUP file to prevent it from being buried by other nearby airports.
         row = result.pop();
-        if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
-            let ls = new LandingSpot(row, keys, glideParams, greenOptions);
-            landingSpots.push(ls);
+        console.log(result.length);
+        let ls = new LandingSpot(row);
+        if (ls == null)
+        {
+            console.log("oops");
+        }
+        if (ls.style == GLIDING_AIRFIELD || ls.style == AIRPORT) {
+            ls.circle = L.circle(ls.latLng, greenOptions);
             ls.circle.addTo(Airports);
         }
-        else if (row[key_style] == GRASS_SURFACE) {
-            let ls = new LandingSpot(row, keys, glideParams, blueOptions);
-            landingSpots.push(ls);
+        else if (ls.style == GRASS_SURFACE) {
+            ls.circle = L.circle(ls.latLng, blueOptions);
             ls.circle.addTo(GrassStrips);
         }
-        else if (row[key_style] == OUTLANDING) {
-            let ls = new LandingSpot(row, keys, glideParams, yellowOptions);
-            landingSpots.push(ls);
+        else if (ls.style == OUTLANDING) {
+            ls.circle = L.circle(ls.latLng, yellowOptions);
             ls.circle.addTo(Landables);
         }
+        else{
+            continue;  // this row is not a landing spot (could be waypoint, etc.)
+        }
+        
+        let radius = glideParams.radius(ls.elevation);
+        let pop = L.popup().setLatLng(ls.latLng).setContent(ls.name + "<br>" + ls.elevation.toFixed(0) + " ft");
+        // popup().setLatLng(ls.latLng) does not work;  the popup still appears at the mouse click instead of the circle center.
+        // So save the desired center in fixedLatLng and use that value in the event handler to relocate the circle
+        pop.fixedLatLng = ls.latLng;
+
+        ls.circle.setRadius(radius).bindPopup(pop);
+        landingSpots.push(ls);
     }
 
     // Force the layer order to be
@@ -358,8 +361,6 @@ function parseCupText(allText) {
     //  Landable Fields
     GrassStrips.bringToBack();
     Landables.bringToBack();
-
-    // map.fitBounds(Airports.getBounds());
 
     // Center the map on the set of all landing spots
     try {
