@@ -33,9 +33,28 @@ const INDEX_LON = 4;
 const INDEX_ELEV = 5;
 const INDEX_STYLE = 6;
 
-let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
-let altitude = parseFloat(document.getElementById('altitudeInput').value);
-let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+class GlideParams {
+    constructor(glideRatio, altitude, arrivalHeight) {
+        this.glideRatio = glideRatio;
+        this.altitude = altitude;
+        this.arrivalHeight = arrivalHeight;
+    }
+
+    radius(elevation) {
+        let r = feetToMeters(this.glideRatio * (this.altitude - this.arrivalHeight - elevation));
+        if (isNaN(r)) r = 1.0;
+        else r = Math.max(r, 1.0);
+        return r;
+    }
+}
+
+function getGlideParams() {
+    let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
+    let altitude = parseFloat(document.getElementById('altitudeInput').value);
+    let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+
+    return new GlideParams(glideRatio, altitude, arrivalHeight);
+}
 
 // Parses an entry in a CUP file.
 // The 2018 format is described here:
@@ -43,7 +62,7 @@ let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').val
 // But Naviter has updated the format since then.  
 // See the lengthy comment in "function parseCupText(allText)"
 class LandingSpot {
-    constructor(csvRecord, keys, options) {
+    constructor(csvRecord, keys, glideParams, options) {
 
         this.name = csvRecord[keys[INDEX_NAME]];
         this.style = csvRecord[keys[INDEX_STYLE]];
@@ -77,19 +96,14 @@ class LandingSpot {
         let lon = sign * (degrees + minutes / 60.0);
 
         this.latLng = L.latLng(lat, lon);
-        let radius = glideRatio * (altitude - arrivalHeight - this.elevation);
-        options.radius = feetToMeters(radius);
+        options.radius = glideParams.radius(this.elevation);
 
-        if (isNaN(radius)) {
-            console.log(this.name + "radius is NaN");
-        }
-        else {
-            // opoup().setLatLng does not work; still pops up at mouse click instead of circle center
-            let pop = L.popup().setLatLng(this.latLng).setContent(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
-            this.circle = L.circle(this.latLng, options);
-            pop.circle = this.circle;
-            this.circle.bindPopup(pop);
-        }
+        // popup().setLatLng(this.latLng) does not work; still pops up at mouse click instead of circle center
+        let pop = L.popup().setLatLng(this.latLng).setContent(this.name + "<br>" + this.elevation.toFixed(0) + " ft");
+        this.circle = L.circle(this.latLng, options);
+
+        pop.fixedLatLng = this.latLng;  
+        this.circle.bindPopup(pop);
     }
 }
 
@@ -98,8 +112,8 @@ let map = L.map('map', { maxZoom: 18 }).setView(sterling, 9);
 
 map.on('popupopen', function (e) {
     // If this is a Landing Spot popup, locate it on the circle center instead of the mouse click
-    if (e.popup.circle) {
-        try { e.popup.setLatLng(e.popup.circle.getLatLng()); }
+    if (e.popup.fixedLatLng) {
+        try { e.popup.setLatLng(e.popup.fixedLatLng); }
         catch (obj) { console.log("Repositioning circle failed for " + e); }
     }
 });
@@ -118,7 +132,8 @@ let overlays = {
 L.control.layers(null, overlays, { position: 'topleft' }).addTo(map);
 
 // Open the layer control to reveal the legend for circle colors.
-// The control will close the first time it loses focus.
+// The control will close the first time it loses focus
+// or something on the map is clicked
 $(".leaflet-control-layers").addClass("leaflet-control-layers-expanded");
 
 // Display instructions in a Tooltip box when this page first loads.
@@ -149,6 +164,10 @@ let el = tooltip.getElement();
 el.addEventListener('click', function () { tooltip.remove(); });
 el.style.pointerEvents = 'auto';
 
+
+// These functions fire when the user checks a box for Landing Spot type
+// in the Layers control, which adds the feature group to the map
+
 // Keep the landables group on the bottom
 Landables.on('add', function () {
     Landables.bringToBack();
@@ -161,8 +180,6 @@ GrassStrips.on('add', function () {
 });
 
 
-// mapbox://styles/dssherrill/cl05wlw12001u15o5l91zzmjk
-// pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ
 let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
     maxZoom: 18,
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
@@ -172,32 +189,20 @@ let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}
     zoomOffset: -1
 }).addTo(map);
 
-// let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
-//     maxZoom: 18,
-//     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
-//         'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
-//     id: 'mapbox/streets-v11',
-//     tileSize: 512,
-//     zoomOffset: -1
-// }).addTo(map);
-
 L.control.scale().addTo(map);
 
-// Updates the radius of the circle for every landing spot using the parameters read from the form
+// Updates the radius of the circle for every landing spot using the parameters read from the form.\
+// This is called when any input parameter changes
 function drawLandingSpots(e) {
-    let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
-    let altitude = parseFloat(document.getElementById('altitudeInput').value);
-    let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+    let glideParams = getGlideParams();
 
     // Save the form inputs
-    localStorage.setItem('glideRatio', glideRatio);
-    localStorage.setItem('altitude', altitude);
-    localStorage.setItem('arrivalHeight', arrivalHeight);
+    localStorage.setItem('glideRatio', glideParams.glideRatio);
+    localStorage.setItem('altitude', glideParams.altitude);
+    localStorage.setItem('arrivalHeight', glideParams.arrivalHeight);
 
     for (let ls of landingSpots) {
-        radius = glideRatio * (altitude - arrivalHeight - ls.elevation);
-        radius = Math.max(1.0, radius);
-        ls.circle.setRadius(feetToMeters(radius));
+        ls.circle.setRadius(glideParams.radius(ls.elevation));
     }
 }
 
@@ -281,10 +286,7 @@ function parseCupText(allText) {
 
     removeAllLandingSpots();
 
-    // TODO: these are passed to the LandingSpot constructor as globals.  That is wrong.
-    glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
-    altitude = parseFloat(document.getElementById('altitudeInput').value);
-    arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+    let glideParams = getGlideParams();
 
     let yellowOptions = { color: 'black', fillColor: 'yellow', opacity: 1, fillOpacity: 1 };
     let blueOptions = { color: 'black', fillColor: 'blue', opacity: 1, fillOpacity: 1 };
@@ -334,17 +336,17 @@ function parseCupText(allText) {
         // CUP file to prevent it from being buried by other nearby airports.
         row = result.pop();
         if (row[key_style] == GLIDING_AIRFIELD || row[key_style] == AIRPORT) {
-            let ls = new LandingSpot(row, keys, greenOptions);
+            let ls = new LandingSpot(row, keys, glideParams, greenOptions);
             landingSpots.push(ls);
             ls.circle.addTo(Airports);
         }
         else if (row[key_style] == GRASS_SURFACE) {
-            let ls = new LandingSpot(row, keys, blueOptions);
+            let ls = new LandingSpot(row, keys, glideParams, blueOptions);
             landingSpots.push(ls);
             ls.circle.addTo(GrassStrips);
         }
         else if (row[key_style] == OUTLANDING) {
-            let ls = new LandingSpot(row, keys, yellowOptions);
+            let ls = new LandingSpot(row, keys, glideParams, yellowOptions);
             landingSpots.push(ls);
             ls.circle.addTo(Landables);
         }
