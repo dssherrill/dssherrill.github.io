@@ -163,7 +163,7 @@ tooltip.setContent(
     "<li>Use the button to load your CUP file (optional)" +
     "<li>Click this box to dismiss it" +
     "</ul>" +
-    "Contact:  soarer@sherrill.in"
+    "Contact:  glide@sherrill.in"
 );
 
 tooltip.setLatLng(map.getCenter());
