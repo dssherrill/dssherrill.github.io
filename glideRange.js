@@ -15,6 +15,17 @@
 
 /*jshint esversion: 6 */
 
+// Validation constants - keep in sync with HTML input attributes
+const GLIDE_RATIO_MIN = 1;
+const GLIDE_RATIO_MAX = 100;
+const GLIDE_RATIO_DEFAULT = 20;
+const ALTITUDE_MIN = 0;
+const ALTITUDE_MAX = 50000;
+const ALTITUDE_DEFAULT = 3500;
+const ARRIVAL_HEIGHT_MIN = 0;
+const ARRIVAL_HEIGHT_MAX = 10000;
+const ARRIVAL_HEIGHT_DEFAULT = 1000;
+
 // Clear stored entries on reset request
 const paramsString = window.location.search;
 let searchParams = new URLSearchParams(paramsString);
@@ -48,10 +59,41 @@ class GlideParams {
     }
 }
 
+/**
+ * Validates and sanitizes user input for glide parameters
+ * @param {number} value - The value to validate
+ * @param {number} min - Minimum allowed value
+ * @param {number} max - Maximum allowed value
+ * @param {number} defaultValue - Default value if validation fails
+ * @returns {number} Validated and sanitized value
+ */
+function validateInput(value, min, max, defaultValue) {
+    const num = parseFloat(value);
+    if (isNaN(num) || num < min || num > max) {
+        return defaultValue;
+    }
+    return num;
+}
+
 function getGlideParams() {
-    let glideRatio = parseFloat(document.getElementById('glideRatioInput').value);
-    let altitude = parseFloat(document.getElementById('altitudeInput').value);
-    let arrivalHeight = parseFloat(document.getElementById('arrivalHeightInput').value);
+    let glideRatio = validateInput(
+        document.getElementById('glideRatioInput').value,
+        GLIDE_RATIO_MIN, GLIDE_RATIO_MAX, GLIDE_RATIO_DEFAULT
+    );
+    let altitude = validateInput(
+        document.getElementById('altitudeInput').value,
+        ALTITUDE_MIN, ALTITUDE_MAX, ALTITUDE_DEFAULT
+    );
+    let arrivalHeight = validateInput(
+        document.getElementById('arrivalHeightInput').value,
+        ARRIVAL_HEIGHT_MIN, ARRIVAL_HEIGHT_MAX, ARRIVAL_HEIGHT_DEFAULT
+    );
+
+    // Ensure arrival height is less than altitude
+    if (arrivalHeight >= altitude) {
+        // Use proportional approach for low altitudes
+        arrivalHeight = Math.max(0, Math.min(altitude * 0.9, altitude - 100));
+    }
 
     return new GlideParams(glideRatio, altitude, arrivalHeight);
 }
@@ -189,7 +231,12 @@ GrassStrips.on('add', function () {
 });
 
 
-let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbDAydXFrbWowaDI5M2JtajBlZTFzaXluIn0.Wji4RxsuxVWPHl8yf26yJQ', {
+// MAPBOX CONFIGURATION
+// To update the Mapbox API token:
+// 1. Get a token from https://account.mapbox.com/
+// 2. Replace the access_token parameter below with your token
+// 3. See CONFIGURATION.md for detailed instructions and security best practices
+let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiZHNzaGVycmlsbCIsImEiOiJjbWxpdXYwdG8wNzJjM2twcXU3YzA1Y3pvIn0.iauIPMpWdad-JiAR3ehz2Q', {
     maxZoom: 18,
     attribution: 'Map data &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, ' +
         'Imagery © <a href="https://www.mapbox.com/">Mapbox</a>',
@@ -200,15 +247,22 @@ let tiles = L.tileLayer('https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}
 
 L.control.scale().addTo(map);
 
-// Updates the radius of the circle for every landing spot using the parameters read from the form.\
-// This is called when any input parameter changes
+/**
+ * Updates the radius of circles for all landing spots based on current parameters
+ * This is called when any input parameter changes
+ */
 function drawLandingSpots(e) {
     let glideParams = getGlideParams();
 
-    // Save the form inputs
-    localStorage.setItem('glideRatio', glideParams.glideRatio);
-    localStorage.setItem('altitude', glideParams.altitude);
-    localStorage.setItem('arrivalHeight', glideParams.arrivalHeight);
+    // Save the form inputs with error handling
+    try {
+        localStorage.setItem('glideRatio', glideParams.glideRatio);
+        localStorage.setItem('altitude', glideParams.altitude);
+        localStorage.setItem('arrivalHeight', glideParams.arrivalHeight);
+    } catch (error) {
+        console.warn('Could not save parameters to localStorage:', error);
+        // Continue even if storage fails
+    }
 
     for (let ls of landingSpots) {
         ls.circle.setRadius(glideParams.radius(ls.elevation));
@@ -259,33 +313,83 @@ glideParameters.addEventListener('change', drawLandingSpots);
 // Load the default landing spots
 map.whenReady(function () {
     // Try to reload the stored copy of the CUP file
-    let allText = localStorage.getItem('landingSpots');
-    if (allText) {
-        processCupData(allText);
+    try {
+        let allText = localStorage.getItem('landingSpots');
+        if (allText) {
+            processCupData(allText);
+            restoreGlideParameters();
+            drawLandingSpots();
+        }
+        else {
+            // Nothing has been stored. Load the default CUP file
+            fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.text();
+                })
+                .then(data => {
+                    restoreGlideParameters();
+                    processCupData(data);
+                })
+                .catch(error => {
+                    console.error('Error loading default CUP file:', error);
+                    // Continue with empty map if default file fails to load
+                    restoreGlideParameters();
+                });
+        }
+    } catch (error) {
+        console.error('Error accessing localStorage:', error);
+        // Continue with defaults if localStorage fails
         restoreGlideParameters();
-        drawLandingSpots();
-    }
-    else {
-        // Nothing has been stored.  Load the default CUP file
-        fetch('https://dssherrill.github.io/Sterling,%20Massachusetts%202021%20SeeYou.cup')
-            .then(response => response.text())
-            .then(data => {
-                restoreGlideParameters();
-                processCupData(data);
-            });
     }
 });
 
+/**
+ * Loads and processes a CUP waypoint file selected by the user
+ * @param {Event} e - The file input change event
+ */
 function loadCupFile(e) {
     e.preventDefault();
 
     const input = csvFile.files[0];
+    if (!input) {
+        console.warn('No file selected');
+        return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (input.size > maxSize) {
+        console.error('File too large. Maximum allowed size is 5MB');
+        alert('File is too large. Please select a file smaller than 5MB.');
+        return;
+    }
+
     const reader = new FileReader();
 
+    reader.onerror = function() {
+        console.error('Error reading file');
+        alert('Error reading file. Please try again.');
+    };
+
     reader.onload = function (e) {
-        const allText = e.target.result;
-        processCupData(allText);
-        localStorage.setItem('landingSpots', allText);
+        try {
+            const allText = e.target.result;
+            processCupData(allText);
+            
+            // Store in localStorage with error handling
+            try {
+                localStorage.setItem('landingSpots', allText);
+            } catch (storageError) {
+                console.warn('Could not save to localStorage:', storageError);
+                // Continue even if storage fails
+            }
+        } catch (error) {
+            console.error('Error processing CUP file:', error);
+            alert('Error processing CUP file. Please check the file format.');
+        }
     };
 
     reader.readAsText(input);
@@ -389,13 +493,11 @@ function processCupData(allText) {
 
 // Remove all landing spots before loading a new CUP file
 function removeAllLandingSpots() {
-    // Remove circles from the map
-    for (let ls of landingSpots) {
-        let c = ls.circle;
-        c.removeFrom(Airports);
-        c.removeFrom(GrassStrips);
-        c.removeFrom(Landables);
-    }
+    // Clear all layers from feature groups
+    // This removes all circles regardless of whether they're tracked in landingSpots
+    Airports.clearLayers();
+    GrassStrips.clearLayers();
+    Landables.clearLayers();
 
     // Remove all landing spots from the array
     landingSpots.length = 0;

@@ -52,6 +52,10 @@
 
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Glide Range Map - Visualize glider range based on altitude and glide ratio">
+    <!-- Content Security Policy: 'unsafe-inline' is used for inline scripts/styles for simplicity.
+         For enhanced security, consider moving inline scripts to external files and using nonces. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com https://cdn-geoweb.s3.amazonaws.com https://cdn.jsdelivr.net https://code.jquery.com https://cdnjs.cloudflare.com https://www.statcounter.com https://dssherrill.github.io; style-src 'self' 'unsafe-inline' https://unpkg.com https://cdn-geoweb.s3.amazonaws.com; img-src 'self' data: https://unpkg.com https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com https://c.statcounter.com https://api.mapbox.com; connect-src 'self' https://dssherrill.github.io https://nominatim.openstreetmap.org https://geocode.arcgis.com; font-src 'self' data:;">
 
     <link rel="shortcut icon" type="image/x-icon" href="docs/images/favicon.ico" />
 
@@ -73,29 +77,24 @@
 
     <style>
         html * {
-            /* font-size: 16px;
-            line-height: 1.625; */
             font-family: Nunito, sans-serif;
         }
-    </style>
 
-    <style>
         html,
         body {
             height: 100%;
-            margin: 0
+            margin: 0;
         }
 
         ul {
             padding-left: 20px;
         }
 
-        ​ .legend i {
+        .legend i {
             width: 10px;
             height: 10px;
             float: left;
             margin-right: 25px;
-            /* opacity: 0.7; */
         }
 
         .leaflet-container {
@@ -120,9 +119,7 @@
             pointer-events: none;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 1.0);
         }
-    </style>
 
-    <style>
         g {
             opacity: 0.25;
         }
@@ -131,28 +128,32 @@
 </head>
 
 <body>
-    <div id="map" style="width: 1000px; height: 600px;"></div>
+    <div id="map" style="width: 1000px; height: 600px;" role="application" aria-label="Glide range map"></div>
 
-    <div id="inputsDiv" sytle="margin: 5px;">
+    <div id="inputsDiv" style="margin: 5px;">
         <form id="glideParameters">
-
-            <!-- <form id="options"> -->
-            <label for="glideRatioInput" style="margin: 12px">Glide Ratio</label> <input type="number" value="20"
-                min="0" id="glideRatioInput" name="glideRatioInput" autofocus />
+            <label for="glideRatioInput" style="margin: 12px">Glide Ratio</label> 
+            <input type="number" value="20" min="1" max="100" step="0.1" id="glideRatioInput" 
+                   name="glideRatioInput" aria-label="Glide ratio (1-100)" required />
             <br>
-            <label for="altitudeInput" style="margin: 12px">Altitude MSL (ft)</label> <input type="number" value="3500"
-                min="0" id="altitudeInput" name="altitudeInput" autofocus />
+            <label for="altitudeInput" style="margin: 12px">Altitude MSL (ft)</label> 
+            <input type="number" value="3500" min="0" max="50000" step="100" id="altitudeInput" 
+                   name="altitudeInput" aria-label="Altitude above mean sea level in feet" required />
             <br>
-            <label for="arrivalHeightInput" style="margin: 12px">Arrival Height (ft)</label> <input type="number"
-                value="1000" min="0" id="arrivalHeightInput" name="arrivalHeightInput" autofocus />
+            <label for="arrivalHeightInput" style="margin: 12px">Arrival Height (ft)</label> 
+            <input type="number" value="1000" min="0" max="10000" step="100" id="arrivalHeightInput" 
+                   name="arrivalHeightInput" aria-label="Minimum arrival height in feet" required />
         </form>
         <form id="loadFileForm" style="margin: 12px">
-            Load a CUP file: <input type="file" id="csvFile" accept=".cup" />
+            <label for="csvFile">Load a CUP file:</label> 
+            <input type="file" id="csvFile" accept=".cup" aria-label="Upload CUP waypoint file" />
         </form>
 
-        <script type="text/javascript" src="https://cdn.jsdelivr.net/lodash/4.12.0/lodash.min.js"></script>
-        <script src="https://code.jquery.com/jquery-3.3.1.slim.js"
-            integrity="sha256-fNXJFIlca05BIO2Y5zh1xrShK3ME+/lYZ0j+ChxX2DA=" crossorigin="anonymous"></script>
+        <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"
+            integrity="sha512-WFN04846sdKMIP5LKNphMaWzU7YpMyCU245etK3g/2ARYbPK9Ub18eG+ljU96qKRCWh+quCY7yefSmlkQw1ANQ=="
+            crossorigin="anonymous"></script>
+        <script src="https://code.jquery.com/jquery-3.7.1.slim.min.js"
+            integrity="sha256-kmHvs0B+OpCW5GVHUNjv9rOmY0IvSIRcf7zGUDTDQM8=" crossorigin="anonymous"></script>
         <script src="jquery.csv.js"></script>
         <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/9.15.6/highlight.min.js"></script>
 
